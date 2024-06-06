@@ -1,0 +1,53 @@
+name: Build LKL
+
+on:
+  workflow_dispatch:
+
+  push:
+    paths-ignore:
+      - '.github/workflows/release-lkl.yaml'
+
+  pull_request:
+    paths-ignore:
+      - '.github/workflows/release-lkl.yaml'
+
+jobs:
+  build-lkl:
+    name: Build LKL
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            shlib_ext: .so
+            tarball_id: linux-x86_64
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      actions: write
+
+    steps:
+      - name: Checkout LKL
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Build LKL
+        run: |
+          ./build-lkl.sh
+          cp lkl/tools/lkl/lib/liblkl${{ matrix.shlib_ext }} .
+          strip --strip-unneeded liblkl${{ matrix.shlib_ext }}
+
+      - name: Upload liblkl
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: liblkl_${{ matrix.tarball_id }}-shared
+          path: liblkl${{ matrix.shlib_ext }}
+
+      - name: Check LKL
+        run: |
+          ./lkl/tools/lkl/tests/boot
+
+      - name: Fail fast
+        if: failure()
+        uses: andymckay/cancel-action@0.4
